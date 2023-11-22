@@ -168,7 +168,6 @@ def upload_file_to_s3(response_bytes, filename):
     s3_url = f"s3://{s3_bucket}/images/{image_name}"
     print(f"Uploaded image to {s3_url}")
 
-
 def decode_and_show(response_bytes, s3_bucket, s3_key):
     # Parse the JSON response to get the base64-encoded string
     response_json = json.loads(response_bytes)
@@ -177,27 +176,22 @@ def decode_and_show(response_bytes, s3_bucket, s3_key):
     # Decode the base64 string
     image_data = base64.b64decode(image_base64)
 
-    # Create an image from the byte data
-    image = Image.open(io.BytesIO(image_data))
-    
-    # Prepare the image data for streaming
-    img_io = io.BytesIO()
-    image.save(img_io, 'PNG')
-    img_io.seek(0)
+    # Create an in-memory bytes buffer for the image data
+    img_io = io.BytesIO(image_data)
     
     # Upload to S3
     try:
-        s3_client.upload_fileobj(img_io, s3_bucket, s3_key)
+        # Ensure we're at the start of the image buffer before uploading
+        img_io.seek(0)
+        s3_client.put_object(Bucket=s3_bucket, Key=s3_key, Body=img_io, ContentType='image/png')
         print(f"Image uploaded to S3: {s3_bucket}/{s3_key}")
-    except Exception as e:
+    except BotoCoreError as e:
         print(f"Failed to upload image to S3: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
-    # Ensure the file pointer is at the start
-    img_io.seek(0)
-    image.close()
-    
-    return StreamingResponse(img_io, media_type='image/png')
-
+    # Generate the S3 URL for the uploaded image
+    s3_url = f"https://{s3_bucket}.s3.amazonaws.com/{s3_key}"
+    return {"url": s3_url}
 
 if os.getenv('AWS_EXECUTION_ENV') is not None:
     handler = Mangum(app)
