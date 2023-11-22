@@ -19,6 +19,8 @@ For [SDXL 1.0](https://stablediffusionxl.com) we're using SageMaker's JumpStart 
 
 ### Mistral
 
+Trained with https://github.com/philschmid/llm-sagemaker-sample
+
 For [Mistral 7B](https://mistral.ai/news/announcing-mistral-7b/) we've downloaded the weights
   - Initial Instance Count: 1
   - SageMaker Instance Type: ml.g5.4xlarge ($2.03/hr)
