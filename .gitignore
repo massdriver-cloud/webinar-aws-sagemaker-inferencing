@@ -3,6 +3,7 @@ app/twitchio_listener.py
 app/output
 app/sd_interaction.py
 app/llm_interactions.py
+app/twitch
 
 
 # Byte-compiled / optimized / DLL files

@@ -1,10 +1,8 @@
 import os
-from fastapi import FastAPI, HTTPException, File, UploadFile
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from fastapi.responses import StreamingResponse, PlainTextResponse
 from mangum import Mangum
 import boto3
-from botocore.exceptions import NoCredentialsError
 
 from datetime import datetime
 import hashlib
@@ -46,17 +44,6 @@ class SimplePromptRequest(BaseModel):
 
 # Default values
 DEFAULT_CONTENT_TYPE = "application/json"
-DEFAULT_HISTORY = [
-]
-DEFAULT_SYSTEM_PROMPT = "You are an expert in the field of cloud computing and will give helpful answers to questions about AWS."
-DEFAULT_PARAMETERS = {
-    "do_sample": True,
-    "top_p": 0.9,
-    "temperature": 0.8,
-    "max_new_tokens": 512,
-    "repetition_penalty": 1.03,
-    "stop": ["###", "</s>"]
-}
 
 # Assume other necessary imports are already done
 
@@ -65,7 +52,6 @@ app = FastAPI()
 # Initialize SageMaker session and predictor
 sess = sagemaker.Session()
 sdxl_endpoint_name = os.environ.get("SDXL_ENDPOINT_NAME", "endpoint-name-not-set")
-llm_endpoint_name = os.environ.get("LLM_ENDPOINT_NAME", "endpoint-name-not-set")
 s3_bucket = os.environ.get("S3_BUCKET", "s3-bucket-not-set")
 
 
@@ -85,20 +71,6 @@ s3_client = boto3.client('s3')
 
 app = FastAPI()
 
-
-@app.post("/prompt-mistral")
-async def prompt_mistral(request_data: SimplePromptRequest):
-    """
-    FastAPI endpoint to generate responses using Mistral.
-    """
-    try:
-        return generate_llm_response(request_data.prompt)
-    except HTTPException as http_exception:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error processing the request: {str(e)}")
-
-
 @app.post("/generate-image")
 async def generate_image(payload: ImageGenerationPayload):
     try:
@@ -110,28 +82,11 @@ async def generate_image(payload: ImageGenerationPayload):
         prompt = sdxl_payload.get('text_prompts', [{}])[0].get('text', 'image')
         # Decode the response and return the image
         filename = sanitize_filename(prompt)
-        return decode_and_show(sdxl_response, s3_bucket, 'images/'+filename)
+        return decode_and_show(sdxl_response, s3_bucket, 'generated-images/'+filename)
     except Exception as e:
         # Handle general exceptions
         raise HTTPException(status_code=500, detail=str(e))
     
-def generate_llm_response(prompt: str):
-    request = {
-        'inputs': prompt,
-        'parameters': DEFAULT_PARAMETERS
-    }
-
-    try:
-        response = smr.invoke_endpoint(
-            EndpointName=llm_endpoint_name,
-            ContentType=DEFAULT_CONTENT_TYPE,
-            Body=json.dumps(request)
-        )
-        return response['Body'].read().decode()
-    except Exception as e:
-        print(f"Error generating response: {str(e)}")
-        raise
-
 def sanitize_filename(text):
     # Remove non-alphanumeric characters
     text = re.sub(r'[^a-zA-Z0-9 ]', '', text)
@@ -162,10 +117,10 @@ def upload_file_to_s3(response_bytes, filename):
     image.close()
     # Upload the image to S3
     s3 = boto3.client('s3')
-    s3.put_object(Body=image, Bucket=s3_bucket, Key='images/'+filename)
+    s3.put_object(Body=image, Bucket=s3_bucket, Key='generated-images/'+filename)
 
     # Return the S3 URL of the image
-    s3_url = f"s3://{s3_bucket}/images/{image_name}"
+    s3_url = f"s3://{s3_bucket}/generated-images/{image_name}"
     print(f"Uploaded image to {s3_url}")
 
 def decode_and_show(response_bytes, s3_bucket, s3_key):
