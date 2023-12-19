@@ -1,5 +1,5 @@
 schema: draft-07
-name: webinar-lambda
+name: sage-inference-lambda
 description: lambda for AI webinar
 source_url: github.com/YOUR_ORG/webinar-lambda
 access: private
@@ -7,11 +7,15 @@ type: application
 
 app:
   # Environment variables can be pulled from params or connections using jq
-  envs: {}
+  envs:
+    S3_BUCKET: '.connections.s3_bucket.data.infrastructure.arn | split(":")[-1]'
+    SDXL_ENDPOINT_NAME: '.connections.sdxl_endpoint.data.infrastructure.arn | split(":")[-1]'
     # LOG_RETENTION: .params.observability.retention_days
   # IAM permissions can be assigned to this workload using jq to pull iam from connections
-  policies: []
-    # - .connections.k8s_auth.data.security.iam.subscribe
+  policies:
+    - .connections.s3_bucket.data.security.iam.read
+    - .connections.s3_bucket.data.security.iam.write
+    - .connections.sdxl_endpoint.data.security.iam.invoke.policy_arn
 
 steps:
   - path: src
@@ -33,6 +37,7 @@ params:
       properties:
         path:
           type: string
+          default: generate-image
           title: Path
           description: Last path segment of this API resource. Entering {proxy+} will respond to all paths.
           pattern: "((^[a-zA-Z0-9-_]+$)|(^\\{[a-zA-Z0-9-_]+\\}$)|(^\\{proxy\\+\\}$))"
@@ -40,6 +45,7 @@ params:
             pattern: "Correct format of a path is lowercase letters, numbers, dashes and underscores. For capturing paths the same rules apply but the path must start with and end with curly braces."
         http_method:
           type: string
+          default: POST
           title: HTTP Method
           description: The HTTP method(s) that this route should respond to.
           enum:
@@ -143,20 +149,20 @@ connections:
   required:
     - aws_authentication
     - api_gateway
-    - webinar_bucket
+    - s3_bucket
     - sdxl_endpoint
-    - llm_endpoint
+    # - llm_endpoint
   properties:
     aws_authentication:
       $ref: massdriver/aws-iam-role
     api_gateway:
       $ref: massdriver/aws-api-gateway-rest-api
-    webinar_bucket:
+    s3_bucket:
       $ref: massdriver/aws-s3-bucket
     sdxl_endpoint:
       $ref: massdriver/aws-sagemaker-endpoint
-    llm_endpoint:
-      $ref: massdriver/aws-sagemaker-endpoint
+    # llm_endpoint:
+    #   $ref: massdriver/aws-sagemaker-endpoint
 
 ui:
   ui:order:

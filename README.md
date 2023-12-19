@@ -8,6 +8,13 @@
 - Lambda
 - SageMaker Domain
 
+## Steps:
+1) Clone this repo
+2) Set your `$ARTIFACT_ID` from your massdriver/aws-iam-role AWS Credential Artifact
+3) run **Docker** locally
+4) run `make mass_push` 
+5) run `make mass_publish`
+
 ## Demo Values
 
 ### SDXL

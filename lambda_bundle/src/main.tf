@@ -58,27 +58,8 @@ resource "aws_api_gateway_integration" "mistral" {
   uri                     = module.lambda_application.function_invoke_arn
 }
 
-resource "aws_iam_policy_attachment" "attach_s3_read_policy" {
-  name      = "attach_s3_read_policy"
-  roles      = [local.role_name]
-  policy_arn = var.webinar_bucket.data.security.iam.read.policy_arn
-}
-
-
-resource "aws_iam_policy_attachment" "attach_s3_write_policy" {
-  name     = "attach_s3_write_policy"
-  roles      = [local.role_name]
-  policy_arn = var.webinar_bucket.data.security.iam.write.policy_arn
-}
-
 resource "aws_iam_policy_attachment" "attach_sdxl_invoke_policy" {
   name      = "attach_sdxl_invoke_policy"
   roles      = [local.role_name]
-  policy_arn = var.sdxl_endpoint.data.security.iam.invoke.policy_arn
-}
-
-resource "aws_iam_policy_attachment" "attach_llm_invoke_policy" {
-  name      = "attach_llm_invoke_policy"
-  roles      = [local.role_name]
-  policy_arn = var.llm_endpoint.data.security.iam.invoke.policy_arn
+  policy_arn = var.
 }
