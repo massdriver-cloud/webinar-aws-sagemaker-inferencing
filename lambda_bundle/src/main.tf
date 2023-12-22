@@ -13,31 +13,66 @@ module "lambda_application" {
   memory_size       = var.runtime.memory_size
   execution_timeout = var.runtime.execution_timeout
 }
-
-resource "aws_api_gateway_resource" "main" {
+### Diffusers Block ###
+resource "aws_api_gateway_resource" "diffuser" {
   rest_api_id = local.api_id
   parent_id   = var.api_gateway.data.infrastructure.root_resource_id
-  path_part   = var.api.path
+  path_part   = var.api.diffuser_path
 }
 
-resource "aws_api_gateway_method" "main" {
+resource "aws_api_gateway_method" "diffuser" {
   rest_api_id   = local.api_id
-  resource_id   = aws_api_gateway_resource.main.id
-  http_method   = var.api.http_method
+  resource_id   = aws_api_gateway_resource.diffuser.id
+  http_method   = var.api.diffuser_http_method
   authorization = "NONE"
 }
 
-resource "aws_api_gateway_integration" "main" {
+resource "aws_api_gateway_integration" "diffuser" {
   rest_api_id             = local.api_id
-  resource_id             = aws_api_gateway_resource.main.id
-  http_method             = aws_api_gateway_method.main.http_method
+  resource_id             = aws_api_gateway_resource.diffuser.id
+  http_method             = aws_api_gateway_method.diffuser.http_method
   integration_http_method = "POST"
   type                    = "AWS_PROXY"
   uri                     = module.lambda_application.function_invoke_arn
 }
 
-resource "aws_iam_policy_attachment" "attach_sdxl_invoke_policy" {
-  name      = "attach_sdxl_invoke_policy"
+resource "aws_iam_policy_attachment" "attach_diffuser_invoke_policy" {
+  name      = "attach_diffuser_invoke_policy"
   roles      = [local.role_name]
-  policy_arn = var.sdxl_endpoint.data.security.iam.invoke.policy_arn
+  policy_arn = var.diffuser_endpoint.data.security.iam.invoke.policy_arn
 }
+
+### Diffusers Block End###
+
+
+### LLM Block ###
+resource "aws_api_gateway_resource" "llm" {
+  rest_api_id = local.api_id
+  parent_id   = var.api_gateway.data.infrastructure.root_resource_id
+  path_part   = var.api.llm_path
+}
+
+resource "aws_api_gateway_method" "llm" {
+  rest_api_id   = local.api_id
+  resource_id   = aws_api_gateway_resource.llm.id
+  http_method   = var.api.llm_http_method
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_integration" "llm" {
+  rest_api_id             = local.api_id
+  resource_id             = aws_api_gateway_resource.llm.id
+  http_method             = aws_api_gateway_method.llm.http_method
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = module.lambda_application.function_invoke_arn
+}
+
+resource "aws_iam_policy_attachment" "attach_llm_invoke_policy" {
+  name      = "attach_llm_invoke_policy"
+  roles      = [local.role_name]
+  policy_arn = var.llm_endpoint.data.security.iam.invoke.policy_arn
+}
+
+
+### LLM Block End###

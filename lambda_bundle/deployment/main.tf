@@ -14,11 +14,21 @@ resource "aws_api_gateway_deployment" "main" {
   }
 }
 
-resource "aws_lambda_permission" "main" {
+# resource "aws_lambda_permission" "diffuser" {
+#   statement_id  = "AllowDiffuserExecutionFromAPIGateway"
+#   action        = "lambda:InvokeFunction"
+#   function_name = var.md_metadata.name_prefix
+#   principal     = "apigateway.amazonaws.com"
+
+#   source_arn = "${aws_api_gateway_deployment.main.execution_arn}/${var.api.diffuser_http_method}/${var.api.diffuser_path}"
+# }
+
+
+resource "aws_lambda_permission" "llm" {
   statement_id  = "AllowExecutionFromAPIGateway"
   action        = "lambda:InvokeFunction"
   function_name = var.md_metadata.name_prefix
   principal     = "apigateway.amazonaws.com"
 
-  source_arn = "${aws_api_gateway_deployment.main.execution_arn}/${var.api.http_method}/${var.api.path}"
+  source_arn = "${aws_api_gateway_deployment.main.execution_arn}/${var.api.llm_http_method}/${var.api.llm_path}"
 }

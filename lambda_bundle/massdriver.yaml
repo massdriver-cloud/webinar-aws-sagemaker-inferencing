@@ -1,5 +1,5 @@
 schema: draft-07
-name: ai-lambda
+name: ai-lambda-hackathon
 description: lambda for AI webinar
 source_url: github.com/YOUR_ORG/webinar-lambda
 access: private
@@ -9,7 +9,9 @@ app:
   # Environment variables can be pulled from params or connections using jq
   envs: 
     S3_BUCKET: '.connections.s3_bucket.data.infrastructure.arn | split(":")[-1]'
-    SDXL_ENDPOINT_NAME: '.connections.sdxl_endpoint.data.infrastructure.arn | split("/")[-1]'
+    DIFFUSER_ENDPOINT_NAME: '.connections.diffuser_endpoint.data.infrastructure.arn | split("/")[-1]'
+    LLM_ENDPOINT_NAME: '.connections.llm_endpoint.data.infrastructure.arn | split("/")[-1]'
+
   policies: 
     - .connections.s3_bucket.data.security.iam.read
     - .connections.s3_bucket.data.security.iam.write
@@ -28,19 +30,44 @@ params:
       type: object
       title: API Settings
       required:
-        - path
-        - http_method
+        - diffuser_path
+        - diffuser_http_method
+        - llm_path
+        - llm_http_method
       properties:
-        path:
+        diffuser_path:
           type: string
-          title: Path
+          title: Diffuser Path
+          default: generate-image
           description: Last path segment of this API resource. Entering {proxy+} will respond to all paths.
           pattern: "((^[a-zA-Z0-9-_]+$)|(^\\{[a-zA-Z0-9-_]+\\}$)|(^\\{proxy\\+\\}$))"
           message:
             pattern: "Correct format of a path is lowercase letters, numbers, dashes and underscores. For capturing paths the same rules apply but the path must start with and end with curly braces."
-        http_method:
+        diffuser_http_method:
           type: string
-          title: HTTP Method
+          title: Diffuser HTTP Method
+          default: POST
+          description: The HTTP method(s) that this route should respond to.
+          enum:
+            - POST
+            - GET
+            - PUT
+            - DELETE
+            - HEAD
+            - OPTIONS
+            - ANY
+        llm_path:
+          type: string
+          title: LLM Path
+          default: generate-text
+          description: Last path segment of this API resource. Entering {proxy+} will respond to all paths.
+          pattern: "((^[a-zA-Z0-9-_]+$)|(^\\{[a-zA-Z0-9-_]+\\}$)|(^\\{proxy\\+\\}$))"
+          message:
+            pattern: "Correct format of a path is lowercase letters, numbers, dashes and underscores. For capturing paths the same rules apply but the path must start with and end with curly braces."
+        llm_http_method:
+          type: string
+          title: LLM HTTP Method
+          default: POST
           description: The HTTP method(s) that this route should respond to.
           enum:
             - POST
@@ -125,8 +152,8 @@ connections:
     - aws_authentication
     - api_gateway
     - s3_bucket
-    - sdxl_endpoint
-    # - llm_endpoint
+    - diffuser_endpoint
+    - llm_endpoint
   properties:
     aws_authentication:
       $ref: massdriver/aws-iam-role
@@ -134,10 +161,10 @@ connections:
       $ref: massdriver/aws-api-gateway-rest-api
     s3_bucket:
       $ref: massdriver/aws-s3-bucket
-    sdxl_endpoint:
+    diffuser_endpoint:
       $ref: massdriver/aws-sagemaker-endpoint
-    # llm_endpoint:
-    #   $ref: massdriver/aws-sagemaker-endpoint
+    llm_endpoint:
+      $ref: massdriver/aws-sagemaker-endpoint
 
 ui:
   ui:order:
@@ -146,10 +173,10 @@ ui:
     - observability
   api:
     ui:order:
-      - path
-      - http_method
-      - path_2
-      - http_method_2
+      - diffuser_path
+      - diffuser_http_method
+      - llm_path
+      - llm_http_method
   runtime:
     ui:order:
       - image

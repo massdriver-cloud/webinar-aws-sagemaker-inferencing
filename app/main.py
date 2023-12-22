@@ -16,7 +16,8 @@ import re
 # Specific imports for SageMaker
 from sagemaker.predictor import Predictor
 from sagemaker.serializers import JSONSerializer
-from sagemaker.deserializers import BytesDeserializer
+from sagemaker.deserializers import BytesDeserializer, JSONDeserializer
+
 import sagemaker
 import json
 from typing import List
@@ -77,6 +78,13 @@ sdxl_model_predictor = Predictor(
     deserializer=BytesDeserializer()
 )
 
+llm_predictor = Predictor(
+    endpoint_name=llm_endpoint_name,
+    sagemaker_session=sess,
+    serializer=JSONSerializer(),
+    deserializer=JSONDeserializer()
+)
+
 
 # Create a SageMaker client
 smr = boto3.client('sagemaker-runtime')
@@ -86,7 +94,7 @@ s3_client = boto3.client('s3')
 app = FastAPI()
 
 
-@app.post("/prompt-mistral")
+@app.post("/generate-text")
 async def prompt_mistral(request_data: SimplePromptRequest):
     """
     FastAPI endpoint to generate responses using Mistral.
@@ -116,18 +124,34 @@ async def generate_image(payload: ImageGenerationPayload):
         raise HTTPException(status_code=500, detail=str(e))
     
 def generate_llm_response(prompt: str):
-    request = {
-        'inputs': prompt,
-        'parameters': DEFAULT_PARAMETERS
-    }
+    # request = {
+    #     'inputs': prompt,
+    #     'parameters': DEFAULT_PARAMETERS
+    # }
 
     try:
-        response = smr.invoke_endpoint(
-            EndpointName=llm_endpoint_name,
-            ContentType=DEFAULT_CONTENT_TYPE,
-            Body=json.dumps(request)
-        )
-        return response['Body'].read().decode()
+        # response = smr.invoke_endpoint(
+        #     EndpointName=llm_endpoint_name,
+        #     ContentType=DEFAULT_CONTENT_TYPE,
+        #     Body=json.dumps(request)
+        # )
+        # Prepare the input data
+        messages = [
+            {
+                "role": "user",
+                "content": prompt,
+            }
+        ]
+        input_json = json.dumps(messages)
+        # Prepare the input data
+        input_data = {"inputs": input_json,
+                    "parameters": DEFAULT_PARAMETERS}
+
+        # Query the SageMaker endpoint
+        response = llm_predictor.predict(input_data)
+
+
+        return response
     except Exception as e:
         print(f"Error generating response: {str(e)}")
         raise
