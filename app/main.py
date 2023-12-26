@@ -5,6 +5,7 @@ from fastapi.responses import StreamingResponse, PlainTextResponse
 from mangum import Mangum
 import boto3
 from botocore.exceptions import NoCredentialsError
+import llm
 
 from datetime import datetime
 import hashlib
@@ -78,14 +79,6 @@ sdxl_model_predictor = Predictor(
     deserializer=BytesDeserializer()
 )
 
-llm_predictor = Predictor(
-    endpoint_name=llm_endpoint_name,
-    sagemaker_session=sess,
-    serializer=JSONSerializer(),
-    deserializer=JSONDeserializer()
-)
-
-
 # Create a SageMaker client
 smr = boto3.client('sagemaker-runtime')
 
@@ -100,7 +93,9 @@ async def prompt_mistral(request_data: SimplePromptRequest):
     FastAPI endpoint to generate responses using Mistral.
     """
     try:
-        return generate_llm_response(request_data.prompt)
+        llm_predictor = llm.get_llm_predictor(llm_endpoint_name, sess)
+    
+        return llm.generate_llm_response(request_data.prompt, llm_predictor)
     except HTTPException as http_exception:
         raise
     except Exception as e:
@@ -122,100 +117,6 @@ async def generate_image(payload: ImageGenerationPayload):
     except Exception as e:
         # Handle general exceptions
         raise HTTPException(status_code=500, detail=str(e))
-    
-def generate_llm_response(prompt: str):
-    # request = {
-    #     'inputs': prompt,
-    #     'parameters': DEFAULT_PARAMETERS
-    # }
-
-    try:
-        # response = smr.invoke_endpoint(
-        #     EndpointName=llm_endpoint_name,
-        #     ContentType=DEFAULT_CONTENT_TYPE,
-        #     Body=json.dumps(request)
-        # )
-        # Prepare the input data
-        messages = [
-            {
-                "role": "user",
-                "content": prompt,
-            }
-        ]
-        input_json = json.dumps(messages)
-        # Prepare the input data
-        input_data = {"inputs": input_json,
-                    "parameters": DEFAULT_PARAMETERS}
-
-        # Query the SageMaker endpoint
-        response = llm_predictor.predict(input_data)
-
-
-        return response
-    except Exception as e:
-        print(f"Error generating response: {str(e)}")
-        raise
-
-def sanitize_filename(text):
-    # Remove non-alphanumeric characters
-    text = re.sub(r'[^a-zA-Z0-9 ]', '', text)
-    # Replace spaces with underscores
-    text = text.replace(' ', '_')
-    # Shorten the text if it's too long
-    safe_prompt = (text[:10] + '..') if len(text) > 10 else text
-    timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
-    hash_part = hashlib.md5(text.encode()).hexdigest()[:6]
-    filename = f"{safe_prompt}_{timestamp}_{hash_part}.png"
-    return filename
-
-def upload_file_to_s3(response_bytes, filename):
-    # Parse the JSON response to get the base64-encoded string
-    response_json = json.loads(response_bytes)
-    image_base64 = response_json['generated_image']
-
-    # Decode the base64 string
-    image_data = base64.b64decode(image_base64)
-
-    # Create an image from the byte data
-    image = Image.open(io.BytesIO(image_data))
-    
-    # Prepare the image data for streaming
-    img_io = io.BytesIO()
-    image.save(img_io, 'PNG')
-    img_io.seek(0)
-    image.close()
-    # Upload the image to S3
-    s3 = boto3.client('s3')
-    s3.put_object(Body=image, Bucket=s3_bucket, Key='images/'+filename)
-
-    # Return the S3 URL of the image
-    s3_url = f"s3://{s3_bucket}/images/{image_name}"
-    print(f"Uploaded image to {s3_url}")
-
-def decode_and_show(response_bytes, s3_bucket, s3_key):
-    # Parse the JSON response to get the base64-encoded string
-    response_json = json.loads(response_bytes)
-    image_base64 = response_json['generated_image']
-
-    # Decode the base64 string
-    image_data = base64.b64decode(image_base64)
-
-    # Create an in-memory bytes buffer for the image data
-    img_io = io.BytesIO(image_data)
-    
-    # Upload to S3
-    try:
-        # Ensure we're at the start of the image buffer before uploading
-        img_io.seek(0)
-        s3_client.put_object(Bucket=s3_bucket, Key=s3_key, Body=img_io, ContentType='image/png')
-        print(f"Image uploaded to S3: {s3_bucket}/{s3_key}")
-    except BotoCoreError as e:
-        print(f"Failed to upload image to S3: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-    # Generate the S3 URL for the uploaded image
-    s3_url = f"https://{s3_bucket}.s3.amazonaws.com/{s3_key}"
-    return {"url": s3_url}
 
 if os.getenv('AWS_EXECUTION_ENV') is not None:
     handler = Mangum(app)
